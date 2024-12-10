@@ -1,61 +1,73 @@
-# TDS PROJECT-2
+# Dataset Analysis Report
 
-The Tale of the Dataset: An Analytical Adventure
+## Insights from LLM
 
-Chapter 1: The Dataset Arrives
-On a bright morning in the world of data exploration, a CSV file landed on my desk. Inside this seemingly simple file lay a treasure trove of information about books—stories, ratings, reviews, and interactions—all waiting to be unraveled. The dataset contained over 9,000 entries, each detailing a book’s journey through the hearts and hands of readers. Key variables included ratings_count, text_reviews_count, and a breakdown of user ratings across five levels, from ratings_1 (disliked) to ratings_5 (loved).
+```markdown
+# README.md
 
-The dataset was vast but imperfect, with some missing values casting shadows on certain columns. As I prepared to analyze it, I knew I would need a combination of statistical tools, visualization techniques, and a sharp sense of curiosity to uncover its secrets.
+## Overview
+This README provides an analysis of a dataset containing information about books, including their ratings and clustering. The analysis includes summary statistics, missing values assessment, and visualizations to help understand the relationships within the data.
 
-Chapter 2: Digging for Insights
-Our first step was a broad exploration of the dataset. I inspected its structure, summarized its statistics, and quantified missing values. This preliminary work painted a picture of the dataset’s health and hinted at where the most valuable stories might lie.
+## Dataset Description
+Unfortunately, there is no dataset description provided. However, based on the summary statistics and column names, the dataset appears to contain variables related to books, including identifiers, ratings, and metadata about the authors and publication details.
 
-The Correlation Heatmap
-To understand the relationships within the data, I constructed a correlation heatmap, which revealed how variables interacted with one another. The heatmap became a map to navigate the dataset’s complexities:
+## Summary Statistics
+The dataset offers a variety of metrics, summarized in the table below:
 
-Strong Patterns: The various rating levels (ratings_1 through ratings_5) displayed strong correlations. This suggested that books with high ratings in one category tended to perform well across the board, pointing to universally loved titles.
-Independent Variables: Some columns, like work_id or isbn, acted as neutral identifiers, disconnected from ratings and interactions. These variables were the supporting cast, important for context but not central to the plot.
-Outliers in the Data
-Next, I searched for outliers—the books that stood out for better or worse. Using statistical techniques like the Interquartile Range (IQR), I identified books that had unusually high or low ratings or reviews.
+| Metric                      | Count           | Mean             | Std Deviation    | Min      | 25%      | 50%      | 75%      | Max         |
+|-----------------------------|------------------|------------------|------------------|----------|----------|----------|----------|-------------|
+| `book_id`                  | 10000           | 5000.50          | 2886.90          | 1        | 2500.75  | 5000.50  | 7500.25  | 10000       |
+| `goodreads_book_id`        | 10000           | 5264697          | 7575462          | 1        | 46275.75 | 394965.5 | 9382225  | 33288647    |
+| `average_rating`           | 10000           | -                | -                | -        | -        | -        | -        | -           |
+| `ratings_count`            | 10000           | 11475.89         | 28546.45         | 323      | 3112.00  | 4894.00  | 9287.00  | 793319      |
+| `Cluster`                  | 9397            | 0.38             | 0.74             | 0        | 0.00     | 0.00     | 1.00     | 3           |
 
-Hidden Gems: Some books had exceptionally high ratings_5 scores, indicating a strong fan base and universal appeal.
-The Disliked Few: Others struggled with higher ratings_1 counts, reflecting books that readers found less satisfying.
-These outliers weren’t just anomalies—they were stories waiting to be told, whether of niche appeal, divisive content, or simply stellar quality.
+This shows that the `book_id` ranges from 1 to 10,000, with a mean of 5000.5. The dataset contains various rating counts, including up to 793,319 ratings for a single book, demonstrating the variance in popularity.
 
-Chapter 3: Discovering the Truths
-With the groundwork laid, the dataset began to speak. Several insights emerged, forming the core of the narrative:
+## Missing Values
+The dataset contains some missing values, as shown in the summary below:
 
-Insight 1: The Universally Loved
-Books with high ratings across the board stood out as universal favorites. They excelled in categories like ratings_5, where readers expressed outright love for the book. These titles held lessons for publishers, authors, and marketers about what resonates deeply with audiences.
+- `isbn` has 700 missing values.
+- `isbn13` has 585 missing values.
+- `original_publication_year` has 21 missing values.
+- `original_title` has 585 missing values.
+- `language_code` has 1084 missing values.
 
-Insight 2: The Silent Dislikes
-In contrast, some books showed high counts of ratings_1, marking them as underperformers. These findings pointed to opportunities for improvement—whether in content, marketing, or targeting.
+| Column Name                  | Number of Missing Values |
+|------------------------------|--------------------------|
+| `isbn`                       | 700                      |
+| `isbn13`                     | 585                      |
+| `original_publication_year` | 21                       |
+| `original_title`            | 585                      |
+| `language_code`             | 1084                     |
 
-Insight 3: Patterns in Interactions
-The data revealed that books with high ratings_count and text_reviews_count also tended to perform well in the upper rating categories. Engagement metrics like reviews and ratings often correlated with success, showing that reader interaction is a valuable indicator of a book's performance.
+### Considerations
+- Missing values in ISBN and original title could affect data integrity and further analysis.
+- Language codes with 1084 missing values suggest potential limitations in the analysis of books by language.
 
-Chapter 4: The Implications
-The insights from this analysis were more than academic; they offered clear paths for action:
+## Visualizations
+Two key visualizations have been generated to better understand the dataset:
 
-For Publishers and Marketers
+1. **Correlation Heatmap**: This visualization helps discern relationships between numerical features in the dataset.
+   ![Correlation Heatmap](.png)
 
-Focus promotional efforts on books that show strong engagement and high ratings to maximize returns.
-Identify struggling books and investigate why they perform poorly. Could it be the content? The cover design? The marketing approach? These are areas worth exploring.
-For Recommendation Engines
+2. **KMeans Clustering**: This visualization illustrates how books are grouped into clusters based on features. Clustered data has been saved in the file [clustered_data.csv](./clustered_data.csv).
+   ![KMeans Clustering](.png) (not provided in the original dataset details but assumed as existent)
 
-The strong correlations between ratings categories can guide the development of algorithms to recommend books. By identifying universally loved titles, platforms can deliver more satisfying user experiences.
-For Authors and Creators
+### Key Findings
+- Correlation Analysis: The correlation heatmap illustrates which features are positively or negatively correlated with each other, providing insight into how different ratings interact.
+- Cluster Analysis: The KMeans Clustering allows for segmenting books into unique groups. Exploring these clusters helps in understanding their characteristics and identifying potential recommendations for users.
 
-Learn from the high-performing books—what themes, styles, or genres make them so appealing? Conversely, analyze low-rated books to avoid common pitfalls.
-Chapter 5: The Final Chapter
-The analysis concluded with a story of patterns, anomalies, and actionable insights. From the vibrant relationships in the correlation heatmap to the outliers that told their unique stories, this dataset revealed a rich landscape of reader behavior and book performance.
+## Conclusion
+This analysis served to summarize a dataset that features various metrics on books, revealing insights into the distribution of ratings and the performance across different clusters. Future analysis should focus on handling missing values and further exploring the implications of the clusters identified.
 
-Armed with these findings, we can move forward with confidence, knowing how to harness the dataset's lessons to inform decisions and spark new explorations. This adventure may be over, but the stories within the data are endless—waiting to be retold, expanded, and acted upon.
+## Acknowledgements
+This dataset's insights are intended for analysis and further exploration in the domain of literature and user preferences. For any inquiries, please refer to the analysis team.
+```
+This README.md file provides a clear, structured overview of the dataset analysis, including important statistics, visualizations, and findings that would be essential for any reader looking to understand the results from the dataset.
 
-This is the story of a dataset transformed into knowledge, and the beginning of many more adventures in the world of books and beyond.
+## Correlation Heatmap
+![Correlation Heatmap](.png)
 
-
-
-
-
-
+## KMeans Clustering
+Clustered data saved as [clustered_data.csv](.\clustered_data.csv)
