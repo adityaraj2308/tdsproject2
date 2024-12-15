@@ -1,357 +1,197 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = [
-#     "ipykernel",
-#     "matplotlib",
-#     "numpy",
-#     "pandas",
-#     "requests",
-#     "seaborn",
+#   "httpx",
+#   "pandas",
+#   "seaborn",
+#   "matplotlib",
+#   "scikit-learn",
+#   "python-dotenv"
 # ]
 # ///
 
-import sys
-import requests
-import json
-# from google.colab import userdata
 import os
-import glob
-import base64
-from io import StringIO
+import sys
+import httpx
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.ensemble import IsolationForest
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from dotenv import load_dotenv
 
-token = os.environ["AIPROXY_TOKEN"]
+# Constants
+API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
-# give unique value counts of categorical column
+# Load .env file
+load_dotenv()
+API_TOKEN = os.environ.get("AIPROXY_TOKEN")
 
-
-
-## to be used in open ai function calling
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_categorical_numerical_column_name",
-            "description": "Get the categorical column names that can be useful in plotting python seaborn pairplot with hue parameter for data visualisation, when the users ask help me with pairplot.Suggest the columns having unique value less than 15 else visualization is not possible. For numerical names suggest columns having data type as int or float but avoid columns having id value",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "categorical_column": {
-                        "type": "string",
-                        "description": "List of categorical column names can be used in hue parameter of seaborn pairplot",
-                    },
-                     "numerical_column": {
-                        "type": "string",
-                        "description": "List of numerical column names that can be used seaborn pairplot, do not provide column names that contain  id value",
-                    },
-                },
-                "required": ["categorical_column", "numerical_column"],
-                "additionalProperties": False,
-            },
-        }
-    }
-]
+if not API_TOKEN:
+    print("Error: API token is not set in the environment variables. Check your .env file.")
+    sys.exit(1)
 
 
-# openai function calling with the above tools created
-
-def get_categorical_numerical_column_name(categorical_column, folder,df, numerical_column):
-  import seaborn as sns
-  import matplotlib.pyplot as plt
-  """Get the categorical column names that can be useful in plotting python seaborn pairplot with hue parameter for data visualisation, when the users ask help me with pairplot"""
-  cur_dic =  os.getcwd()
-  os.chdir(folder)
-  print(f"num cols: {numerical_column}")
-  print(f"cat colms : {categorical_column}")
-
-  #convert the numerical column to list
-  num_col = []
-  for i in numerical_column.split(','):
-    num_col.append(i.strip())
-
-
-  try:
-    for col in categorical_column.split(','):
-
-      if col.strip() != '':
-        print(f"Generating pairplot for {col}")
-        plt.figure(figsize=(10, 6))
-
-        #append the categorical column
-        if df[col.strip()].nunique() <15:
-          num_col.append(col.strip())
-          sns.pairplot(df[num_col],corner=True,hue=col.strip())
-          plt.savefig(f"paitplot_{col}.png")
-          plt.close()
-          print(f"pairplot generation completed")
-        else:
-          print(f"skipping pairplot generation as unique value of categorical column is too high")
-
-      else:
-        print(f"Generating pairplot for dataframe")
-        sns.pairplot(df[num_col],corner=True)
-        plt.savefig("paitplot.png")
-        plt.close()
-        print(f"pairplot generation completed")
-  except Exception as e:
-    print(f'pairplot generation has failed {e}')
-  os.chdir(cur_dic)    
-
-## function to get image from text of python code
-
-def generate_image_from_text_input(folder,text,df):
-  text = text.replace("`",'')
-  text = text.replace("python",'')
-  cur_dic =  os.getcwd()
-  try:
-    ## change the directory to store the image
-    os.chdir(folder)
-    exec(text)
-    print('Generated image successfully')
-    return 'success'
-  except Exception as e:
-    print(e)
-    print('Generated image failed!!')
-    return ('python code has failed with the error {e}')
-
-  os.chdir(cur_dic)
-
-
-def main(filename,token):
-    print("Hello from project2!")
-    
-
-    headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {token}"
-}
-
-
-    df = pd.read_csv(filename,encoding='latin-1')
-    filename =  filename.split('/')[-1]
-
-    #create the folder with file name to store the results
-    folder =  filename.split('/')[-1].replace('.csv','')
+# Function to read CSV files
+def read_csv_file(filename):
     try:
-      os.mkdir(folder)
-      print('folder created successfully')
-    except:
-      print('folder already present')
-
-    current_directory = os.getcwd()
-    folder = os.path.join(current_directory, folder)
-
-    
-    
-
-    message = {}
-    # Use StringIO to capture the output of df.info()
-    buffer = StringIO()
-    df.info(buf=buffer)
-    text = buffer.getvalue()
-
-    message['dataframe column details'] = text
-    text = df.describe().to_dict()
-    message['dataframe describe'] = text
-    temp = ''
-    text_unique = ''
-    for col in df.columns:
-        if df[col].dtype == 'object':  # Check for categorical columns (object dtype)
-            unique_counts = df[col].nunique()
-            temp = f"Unique value counts for column '{col}':\n{unique_counts}\n"
-            text_unique = temp+ ' '+ text_unique
-    message['dataframe categorical column'] = text_unique
-      
+        return pd.read_csv(filename, encoding="utf-8")
+    except UnicodeDecodeError:
+        print("Warning: UTF-8 encoding failed. Trying ISO-8859-1 (Latin-1).")
+        return pd.read_csv(filename, encoding="ISO-8859-1")
 
 
+# Perform data analysis
+def analyze_data(df):
+    # Separate numeric and non-numeric columns
+    numeric_df = df.select_dtypes(include=["number"])
+    non_numeric_df = df.select_dtypes(exclude=["number"])
 
-        
-    ## 1st prompt asking about python codes for chart
-    data = {
-        "model": "gpt-4o-mini",  # or another suitable model
-        "messages": [
-            {"role": "system", "content": "Will be given details of pandas dataframe named as df, write 3 python code to create charts using seaborn to visualize the data and save it as png with different names.Only share the python codes"},
-            {"role": "user", "content": json.dumps(message)}
+    # Handle missing values for numeric columns
+    numeric_imputer = SimpleImputer(strategy='mean')
+    df[numeric_df.columns] = numeric_imputer.fit_transform(numeric_df)
 
-                    ]
+    # Handle missing values for non-numeric columns
+    non_numeric_imputer = SimpleImputer(strategy='most_frequent')
+    df[non_numeric_df.columns] = non_numeric_imputer.fit_transform(non_numeric_df)
+
+    analysis = {
+        "summary": df.describe(include="all").to_dict(),
+        "missing_values": df.isnull().sum().to_dict(),
+        "correlation": numeric_df.corr().to_dict(),
+        "outliers": detect_outliers(df),
+        "clusters": cluster_analysis(df),
     }
+    return analysis
 
-    response = requests.post("https://aiproxy.sanand.workers.dev/openai/v1/chat/completions", headers=headers, json=data)
 
-    if response.status_code == 200:
-        response_json = response.json()
-        code = response_json['choices'][0]['message']['content'] # Print the date
-        # print(code)
-        print("Python codes to generate chart has been received from OPENAI..")
+# Detect outliers using Isolation Forest
+def detect_outliers(df):
+    numeric_df = df.select_dtypes(include=["number"])
+    if numeric_df.empty:
+        return "No numeric data for outlier detection."
+    clf = IsolationForest(contamination=0.05, random_state=42)
+    outliers = clf.fit_predict(numeric_df)
+    return pd.Series(outliers).value_counts().to_dict()
 
-    else:
-        print(f"Error: {response.status_code}")
 
-    #call the function to create charts from code
-    func_output = generate_image_from_text_input(folder,code,df)
-
-    ##if there is failure in image generation then call the openai again
-    iteration = 0
-    # stop at 2nd iteration
-    for i in range(2):
-      if func_output != 'success':
-        print(f'iteration {iteration}')
-        iteration+=1
-          
-        ## 1st prompt asking about python codes for chart
-        data = {
-            "model": "gpt-4o-mini",  # or another suitable model
-            "messages": [
-                {"role": "system", "content": "Will be given details of pandas dataframe named as df, write 3 python code (If any column is having date value convert to pandas Datetime format) to create charts using seaborn to visualize the data and save it as png with different names.Only share the python codes"},
-                {"role": "user", "content": json.dumps(message)},
-                {"role": "user", "content": f"fix the below error and provide new code to generate 3 charts error: {func_output}"}
-                        ]
+# Perform clustering analysis
+def cluster_analysis(df):
+    numeric_df = df.select_dtypes(include=["number"])
+    if numeric_df.shape[0] > 1 and numeric_df.shape[1] > 1:
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(numeric_df.dropna())
+        kmeans = KMeans(n_clusters=3, random_state=42)
+        clusters = kmeans.fit_predict(scaled_data)
+        cluster_centroids = pd.DataFrame(kmeans.cluster_centers_, columns=numeric_df.columns)
+        cluster_summary = {
+            "cluster_counts": pd.Series(clusters).value_counts().to_dict(),
+            "centroids": cluster_centroids.to_dict(orient="list")
         }
+        return cluster_summary
+    return "Insufficient data for clustering."
 
-        response = requests.post("https://aiproxy.sanand.workers.dev/openai/v1/chat/completions", headers=headers, json=data)
 
-        if response.status_code == 200:
-            response_json = response.json()
-            code = response_json['choices'][0]['message']['content'] # Print the date
-            print(code)
-            print("Python codes to generate chart has been received from OPENAI..")
-            func_output = generate_image_from_text_input(folder,code,df)
+# Generate a single visualization
+def generate_visualization(df, output_dir):
+    numeric_df = df.select_dtypes(include=["number"])
 
-        else:
-            print(f"Error: {response.status_code}")
-        
-    ##function calling start
+    if numeric_df.shape[1] > 1:  # Generate Correlation heatmap if possible
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(numeric_df.corr(), annot=True, cmap="coolwarm")
+        plt.title("Correlation Matrix")
+        heatmap_filename = "correlation_matrix.png"
+        plt.savefig(os.path.join(output_dir, heatmap_filename))
+        return heatmap_filename
 
-    
+    elif not numeric_df.empty:  # Otherwise, generate a distribution plot
+        col_to_plot = numeric_df.var().idxmax()
+        plt.figure(figsize=(8, 5))
+        sns.histplot(numeric_df[col_to_plot].dropna(), kde=True)
+        plt.title(f"Distribution of {col_to_plot}")
+        dist_filename = f"{col_to_plot}_distribution.png"
+        plt.savefig(os.path.join(output_dir, dist_filename))
+        return dist_filename
 
-    data = {
-        "model": "gpt-4o-mini",  # or another suitable model
-        "messages": [
-            {"role": "system", "content": "You will be given details of pandas dataframe named as df, If the user asks for help with pairplot, use the provided tools"},
-            {"role": "user", "content": json.dumps(message)},
-            {"role": "user", "content": "help me with seaborn pairplot"}
-        ],
-        "tools": tools
+    return None
+
+
+# Send data to LLM
+def send_to_llm(messages):
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Content-Type": "application/json",
     }
-
-    print("before function calling")
-    response = requests.post("https://aiproxy.sanand.workers.dev/openai/v1/chat/completions", headers=headers, json=data)
-
-    print("after function calling")
-
-    if response.status_code == 200:
-        response_json = response.json()
-        # print(response_json)
-        if response_json.get("choices",[{}])[0].get("finish_reason",'') == 'tool_calls':
-          tool_call = response_json['choices'][0]['message']['tool_calls'][0]
-          function_name = tool_call['function']['name']
-          function_args = json.loads(tool_call['function']['arguments'])
-          if function_name == "get_categorical_numerical_column_name":
-            get_categorical_numerical_column_name(function_args.get("categorical_column"),folder,df, function_args.get("numerical_column"))
-        else:
-          code = response_json['choices'][0]['message']['content']
-
-    else:
-        print(f"Error: {response.status_code}")
+    try:
+        response = httpx.post(
+            API_URL,
+            json=messages,
+            headers=headers,
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except httpx.ReadTimeout:
+        print("Error: The request to the AI Proxy timed out. Try again later.")
+        sys.exit(1)
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error: {e.response.status_code} - {e.response.text}")
+        sys.exit(1)
 
 
+# Narrate story based on analysis
+def narrate_story(analysis, chart, output_dir):
+    prompt = f"""
+    Create a README.md narrating this analysis:
+    Data Summary: {analysis['summary']}
+    Missing Values: {analysis['missing_values']}
+    Correlation Matrix: {analysis['correlation']}
+    Outlier Detection: {analysis['outliers']}
+    Clustering Analysis: {analysis['clusters']}
+    Attach this chart: {chart}.
 
-        
-
-
-    ## convert the image to base64 for open api input
-    file_list = glob.glob(f"{folder}/*.png")
-    image_list = []
-    for image in file_list:
-      print(f"encoding image {image}")
-      with open(image, 'rb') as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-        image_list.append(encoded_image)
-
-    print(f"encoding of image is completed ..")
-
-    ## store the description of image in a list for future openai input
-    image_description = []
-    for image in file_list:
-
-      data = {
-          "model": "gpt-4o-mini",  # or another suitable model
-          "messages": [
-              {"role": "system", "content": f"You will be given an chart from {filename} dataset, get insights from this {image.split('/')[-1]} image"},
-              {"role": "user", "content": [
-                  {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_list[0]}",
-                                                      "detail": "low"
-                                                      },
-
-                  }
-              ]}
-          ]
-      }
-
-      response = requests.post("https://aiproxy.sanand.workers.dev/openai/v1/chat/completions", headers=headers, json=data)
-
-      if response.status_code == 200:
-          response_json = response.json()
-          image_description.append("chart name is {image} and chart decription is {response_json['choices'][0]['message']['content']}")
-          print("Insights from the genrated charts done successfully...")
-      else:
-          print(f"Error: {response.status_code}")
-
-    ## pass all the previous input to model to get final output
-    # print(f"file_list{file_list}")
-    image1 =  file_list[0].split('/')[-1]
-    image2 =  file_list[1].split('/')[-1]
-    image3 =  file_list[2].split('/')[-1]
-
- 
-
-    data = {
-      "model": "gpt-4o-mini",  # or another suitable model
-      "messages": [
-          {"role": "system", "content": f"You will be given details {filename} , You will also be given description of 3 charts from this data.Now describe 1.The data you received, briefly 2.The analysis you carried out 3.The insights you discovered 4. The implications of your findings (i.e. what to do with the insights)"},
-          {"role": "user", "content": json.dumps(message)},
-          {"role": "user", "content": json.dumps(image_description)},
-          # {"role": "user", "content": f"chart name is {image2} and chart description is{image_description[1]}"},
-          # {"role": "user", "content": f"chart name is {image3} and chart description is{image_description[2]}"}
-                  ]
-  }
-
-    response = requests.post("https://aiproxy.sanand.workers.dev/openai/v1/chat/completions", headers=headers, json=data)
-
-    if response.status_code == 200:
-        response_json = response.json()
-        # print(response_json['choices'][0]['message']['content']) # Print the date
-        output = response_json['choices'][0]['message']['content'] # Print the date
-        print("Final content of anaylysis has been generated successfully..")
-    else:
-        print(f"Error: {response.status_code}")
-    
-    ## store the text in the README.md file
-
-    with open(f"{folder}/README.md", 'w') as file:
-      file.write(output)
-      print("Program run completed successfully")
+    Key prompts to use:
+    - Identify anomalies or surprising patterns from the analysis.
+    - Suggest potential business decisions or insights based on clustering.
+    - Explain why certain correlations are strong or weak.
+    - Hypothesize causes for missing values and how to handle them.
+    - Provide recommendations for future analysis or data collection.
+    """
+    messages = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are a Markdown writer."},
+            {"role": "user", "content": prompt}
+        ],
+    }
+    story = send_to_llm(messages)
+    with open(os.path.join(output_dir, "README.md"), "w") as file:
+        file.write(story)
 
 
+# Main function
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python autolysis.py <dataset.csv>")
+        sys.exit(1)
 
+    dataset_path = sys.argv[1]
+    output_dir = os.path.splitext(os.path.basename(dataset_path))[0]
 
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
 
-
-
-
-
-
-
-
-
-
-
-
+    try:
+        df = read_csv_file(dataset_path)
+        analysis = analyze_data(df)
+        chart = generate_visualization(df, output_dir)
+        narrate_story(analysis, chart, output_dir)
+        print(f"Analysis complete. See the '{output_dir}' directory for results.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]  # Get the file name from the command-line argument
-        main(filename,token)
-    else:
-      print("Please provide a CSV filename as an argument.")
+    main()
